@@ -8,7 +8,9 @@ load_dotenv()  # reads .env file into environment
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
-CORS(app, supports_credentials=True, origins=["http://localhost:3000"])  # allow React to talk to Flask
+# Allow both local dev and deployed frontend to talk to Flask
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+CORS(app, supports_credentials=True, origins=["http://localhost:3000", FRONTEND_URL])
 
 # Load Google OAuth credentials from .env — never hardcode these
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID")
@@ -108,7 +110,6 @@ def logout():
 # ── RAPIDAPI YAHOO FINANCE ────────────────────────────────────
 
 RAPIDAPI_KEY  = os.getenv("RAPIDAPI_KEY")
-RAPIDAPI_HOST = "yahoo-finance15.p.rapidapi.com"
 RAPIDAPI_HEADERS = {
     "X-RapidAPI-Key":  RAPIDAPI_KEY,
     "X-RapidAPI-Host": RAPIDAPI_HOST,
@@ -121,7 +122,7 @@ def get_stock(ticker):
 
         # Fetch quote (price, change, market cap, volume, P/E etc.)
         quote_res  = requests.get(
-            f"https://{RAPIDAPI_HOST}/api/v1/markets/quote",
+            "https://yahoo-finance15.p.rapidapi.com/api/v1/markets/quote",
             headers=RAPIDAPI_HEADERS,
             params={"ticker": t, "type": "STOCKS"},
         )
@@ -130,7 +131,7 @@ def get_stock(ticker):
 
         # Fetch 30 days of historical closing prices
         hist_res  = requests.get(
-            f"https://{RAPIDAPI_HOST}/api/v1/markets/stock/history",
+            "https://yahoo-finance15.p.rapidapi.com/api/v1/markets/stock/history",
             headers=RAPIDAPI_HEADERS,
             params={"symbol": t, "interval": "1d", "diffandsplits": "false"},
         )
@@ -169,4 +170,8 @@ def get_stock(ticker):
 
 
 if __name__ == "__main__":
+    # Railway assigns a random PORT via environment variable
+    # Falls back to 5000 for local development
+    port = int(os.getenv("PORT", 5000))
+    app.run(debug=False, host="0.0.0.0", port=port)
     app.run(debug=True, port=5000)  # debug=True auto-restarts on save
