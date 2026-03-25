@@ -2,6 +2,8 @@
 
 Full-stack stock dashboard: **Flask** backend + **React (Vite)** frontend. Stock data comes from **yfinance** (Yahoo Finance) — no RapidAPI key required for the workshop.
 
+**Live data only:** the API returns **503** if Yahoo does not provide a usable live quote or daily history (no demo numbers, no empty history masquerading as success). Quotes follow Yahoo’s usual delay rules.
+
 ## Workshop Version
 
 - **Google OAuth is disabled** — the UI uses a fixed “Workshop User” and does not call `/auth/*` or send cookies.

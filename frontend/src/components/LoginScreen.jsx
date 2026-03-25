@@ -1,7 +1,4 @@
-// LoginScreen — Google OAuth login / workshop demo entry (not used in workshop version).
-// GOOGLE OAUTH — not used in workshop version
-// To re-enable: import LoginScreen in App.jsx and show it when user is not logged in.
-// See backend/app.py commented OAuth routes and GOOGLE_OAUTH_SETUP.md.
+// Optional login screen (not mounted in the default workshop App). Re-enable Google OAuth in the backend, then import this component in App.jsx.
 
 // WORKSHOP_MODE — set to true to skip Google OAuth when this screen is used
 const WORKSHOP_MODE = true;

@@ -1,11 +1,11 @@
 """
 Flask API for the workshop stock dashboard.
 
-Workshop version: stock data comes from yfinance only (no RapidAPI, no API keys).
-Google OAuth routes are disabled below — see commented blocks to re-enable.
+Stock data: yfinance (Yahoo) only. Google OAuth is not enabled in this file.
 """
 
 import os
+from datetime import datetime, timezone
 from typing import Any
 
 import yfinance as yf
@@ -13,25 +13,31 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-# Load .env if present; workshop runs fine without any .env file.
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 app = Flask(__name__)
-# GOOGLE OAUTH — not used in workshop version
-# When OAuth is re-enabled, set FLASK_SECRET_KEY in .env for session signing.
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key-workshop")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+HISTORY_START_DATE = os.getenv("HISTORY_START_DATE", "2016-01-01")
 
 CORS(
     app,
     supports_credentials=False,
-    origins=[r"http://localhost:\d+", r"http://127.0.0.1:\d+", FRONTEND_URL],
+    origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        FRONTEND_URL,
+        r"http://localhost:\d+",
+        r"http://127\.0\.0\.1:\d+",
+    ],
 )
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
-    """Coerces a value to float, returning default when missing or invalid."""
+    """Coerce a value to float, or return default when missing or invalid."""
     if value is None:
         return default
     try:
@@ -41,16 +47,37 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 
 
 def _yf_ticker(ticker_symbol: str):
-    """Returns a yfinance Ticker for the given uppercase symbol."""
+    """Return a yfinance Ticker for the given uppercase symbol."""
     return yf.Ticker(ticker_symbol.upper())
 
 
-def build_quote_dict(ticker_symbol: str) -> dict[str, Any]:
-    """
-    Pulls live quote fields from yfinance info / fast_info.
-    Returns a dict suitable for JSON (price, name, market cap, volume, highs/lows, etc.).
-    """
-    stock = _yf_ticker(ticker_symbol)
+def _quote_time_iso_from_info(info: dict) -> str | None:
+    """Convert Yahoo regularMarketTime to ISO UTC string, or None."""
+    raw = info.get("regularMarketTime")
+    if raw is None:
+        return None
+    try:
+        if isinstance(raw, (int, float)):
+            ts = float(raw)
+            if ts > 1e12:
+                ts /= 1000.0
+            return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+        if isinstance(raw, datetime):
+            return raw.astimezone(timezone.utc).isoformat()
+    except (OSError, OverflowError, ValueError):
+        return None
+    return None
+
+
+def json_error_response(message: str, ticker: str, status: int = 503):
+    """Uniform JSON error body for failed stock routes."""
+    return jsonify({"error": message, "ticker": ticker}), status
+
+
+def build_quote_dict(ticker_symbol: str, stock: Any = None) -> dict[str, Any]:
+    """Build live quote fields from yfinance info / fast_info (raises ValueError if no price)."""
+    if stock is None:
+        stock = _yf_ticker(ticker_symbol)
     info: dict = stock.info or {}
     fast: dict = getattr(stock, "fast_info", {}) or {}
 
@@ -61,16 +88,21 @@ def build_quote_dict(ticker_symbol: str) -> dict[str, Any]:
         or ticker_symbol
     )
     price = (
-        info.get("regularMarketPrice")
-        or info.get("currentPrice")
+        info.get("currentPrice")
+        or info.get("regularMarketPrice")
         or fast.get("last_price")
     )
+    if price is None or _safe_float(price) <= 0:
+        raise ValueError(
+            "Live quote unavailable for this symbol (no price from Yahoo). "
+            "Check the ticker or retry in a few seconds."
+        )
     change_pct = info.get("regularMarketChangePercent")
     if change_pct is None:
         change_pct = fast.get("regular_market_change_percent")
 
     market_cap = info.get("marketCap") or fast.get("market_cap")
-    volume = info.get("regularMarketVolume") or info.get("volume") or fast.get("last_volume")
+    volume = info.get("volume") or info.get("regularMarketVolume") or fast.get("last_volume")
 
     day_high = info.get("dayHigh") or info.get("regularMarketDayHigh")
     day_low = info.get("dayLow") or info.get("regularMarketDayLow")
@@ -81,32 +113,44 @@ def build_quote_dict(ticker_symbol: str) -> dict[str, Any]:
     raw_div = info.get("dividendYield")
     dividend_yield = None
     if raw_div is not None:
-        dividend_yield = round(float(raw_div) * 100, 2) if raw_div <= 1 else round(float(raw_div), 2)
+        x = float(raw_div)
+        if x <= 0.2:
+            dividend_yield = round(x * 100, 2)
+        elif x <= 1.0:
+            dividend_yield = round(x, 2)
+        else:
+            dividend_yield = round(x, 2)
+
+    quote_time_iso = _quote_time_iso_from_info(info)
+    market_state = info.get("marketState") or info.get("market_state")
+    tz_name = info.get("exchangeTimezoneName") or info.get("timeZoneFullName")
 
     return {
-        "ticker": ticker_symbol.upper(),
+        "symbol": ticker_symbol.upper(),
         "name": name,
         "price": round(_safe_float(price), 2),
         "change": round(_safe_float(change_pct), 2),
-        "market_cap": market_cap,
         "volume": volume,
-        "day_high": round(_safe_float(day_high), 2) if day_high is not None else None,
-        "day_low": round(_safe_float(day_low), 2) if day_low is not None else None,
+        "marketCap": market_cap,
+        "high": round(_safe_float(day_high), 2) if day_high is not None else None,
+        "low": round(_safe_float(day_low), 2) if day_low is not None else None,
         "week_52_high": round(_safe_float(week_52_high), 2) if week_52_high is not None else None,
         "week_52_low": round(_safe_float(week_52_low), 2) if week_52_low is not None else None,
         "pe_ratio": round(_safe_float(pe_ratio), 2) if pe_ratio is not None else None,
         "dividend_yield": dividend_yield,
+        "quote_time_iso": quote_time_iso,
+        "market_state": market_state,
+        "exchange_timezone": tz_name,
     }
 
 
-def build_history_list(ticker_symbol: str, period: str = "1y") -> list[dict[str, Any]]:
-    """
-    Fetches daily history from yfinance and returns a list of {date, close, volume} dicts.
-    """
-    stock = _yf_ticker(ticker_symbol)
-    hist = stock.history(period=period)
+def build_history_list(ticker_symbol: str, stock: Any = None) -> list[dict[str, Any]]:
+    """Fetch daily bars from HISTORY_START_DATE; return sorted {date, close, volume} rows."""
+    if stock is None:
+        stock = _yf_ticker(ticker_symbol)
+    hist = stock.history(start=HISTORY_START_DATE)
     if hist is None or hist.empty:
-        return []
+        raise ValueError("No historical bars returned from Yahoo for this symbol.")
 
     rows: list[dict[str, Any]] = []
     for date_index, row in hist.iterrows():
@@ -120,12 +164,19 @@ def build_history_list(ticker_symbol: str, period: str = "1y") -> list[dict[str,
                 "volume": int(_safe_float(vol_val, 0)),
             }
         )
+
+    rows.sort(key=lambda r: r["date"])
+    today_str = datetime.now(timezone.utc).date().isoformat()
+    rows = [r for r in rows if r["date"] <= today_str]
     return rows
 
 
+# --- Health (liveness / readiness style probes) ---
+
+
 @app.route("/")
-def index():
-    """Returns JSON confirming the API process is running."""
+def serve_root_status():
+    """Return JSON confirming the API process is running and the configured frontend URL."""
     return jsonify(
         {
             "status": "ok",
@@ -136,95 +187,56 @@ def index():
 
 
 @app.route("/api/healthz")
-def healthz():
-    """Returns JSON health status for monitoring (no secrets)."""
-    return jsonify({"status": "ok", "data_source": "yfinance"})
+def serve_health_status_json():
+    """Return JSON with data source label for monitoring (no secrets)."""
+    return jsonify({"status": "ok", "data_source": "yfinance", "mode": "live_only"})
 
 
 @app.route("/api/health")
-def health():
-    """Minimal liveness probe; returns 200 when Flask is up."""
+def serve_health_ping():
+    """Minimal liveness probe: 200 when Flask is up."""
     return jsonify({"status": "ok"})
 
 
-# --- Stock routes: register /history BEFORE /api/stock/<ticker> (more specific path) ---
+# --- Stock (yfinance) ---
 
 
 @app.route("/api/stock/<ticker>/history")
-def get_stock_history(ticker):
-    """
-    Returns historical OHLC-style points for charting (daily closes for period=1y).
-    Response shape: { "ticker": "...", "history": [ { "date", "close", "volume" }, ... ] }
-    """
+def serve_stock_history_json(ticker):
+    """Return daily history only: ticker, history, history_start, data_source."""
+    ticker_symbol = ticker.upper()
     try:
-        ticker_symbol = ticker.upper()
-        history_points = build_history_list(ticker_symbol, period="1y")
-        return jsonify({"ticker": ticker_symbol, "history": history_points})
+        stock = _yf_ticker(ticker_symbol)
+        history_points = build_history_list(ticker_symbol, stock=stock)
+        return jsonify(
+            {
+                "ticker": ticker_symbol,
+                "history": history_points,
+                "history_start": HISTORY_START_DATE,
+                "data_source": "yfinance",
+            }
+        )
+    except ValueError as exc:
+        return json_error_response(str(exc), ticker_symbol, 503)
     except Exception as exc:
-        return jsonify({"error": str(exc), "ticker": ticker.upper(), "history": []}), 500
+        return json_error_response(str(exc), ticker_symbol, 503)
 
 
 @app.route("/api/stock/<ticker>")
-def get_stock(ticker):
-    """
-    Returns live quote summary for one ticker (price, name, market cap, volume, day high/low, etc.).
-    Does not include full history — use GET /api/stock/<ticker>/history for charts.
-    """
+def serve_stock_quote_and_history_json(ticker):
+    """Return live quote fields plus embedded daily history and metadata."""
+    ticker_symbol = ticker.upper()
     try:
-        ticker_symbol = ticker.upper()
-        payload = build_quote_dict(ticker_symbol)
+        stock = _yf_ticker(ticker_symbol)
+        payload = build_quote_dict(ticker_symbol, stock=stock)
+        payload["history"] = build_history_list(ticker_symbol, stock=stock)
+        payload["history_start"] = HISTORY_START_DATE
+        payload["data_source"] = "yfinance"
         return jsonify(payload)
+    except ValueError as exc:
+        return json_error_response(str(exc), ticker_symbol, 503)
     except Exception as exc:
-        return jsonify({"error": str(exc), "ticker": ticker.upper()}), 500
-
-
-# =============================================================================
-# GOOGLE OAUTH — not used in workshop version
-# Uncomment the block below to re-enable Google login
-# Requires: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, FLASK_SECRET_KEY in .env
-# Also add: pip install requests
-# Also set supports_credentials=True in CORS and use credentials:"include" in fetch from React
-# =============================================================================
-#
-# from urllib.parse import urlparse
-# import requests
-# from flask import redirect, request, session
-#
-# GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-# GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-# GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
-#
-# def frontend_redirect_target():
-#     request_origin = request.headers.get("Origin")
-#     if request_origin and ("localhost" in request_origin or "127.0.0.1" in request_origin):
-#         return request_origin
-#     request_referrer = request.referrer
-#     if request_referrer:
-#         parsed = urlparse(request_referrer)
-#         if parsed.scheme and parsed.netloc:
-#             return f"{parsed.scheme}://{parsed.netloc}"
-#     return FRONTEND_URL
-#
-# @app.route("/auth/workshop-login")
-# def workshop_login():
-#     session["user"] = {...}
-#     return redirect(frontend_redirect_target())
-#
-# @app.route("/auth/login")
-# def login():
-#     ...
-#
-# @app.route("/auth/callback")
-# def callback():
-#     ...
-#
-# @app.route("/auth/me")
-# def me():
-#     ...
-#
-# @app.route("/auth/logout")
-# def logout():
-#     ...
+        return json_error_response(str(exc), ticker_symbol, 503)
 
 
 if __name__ == "__main__":

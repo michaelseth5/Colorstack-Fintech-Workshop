@@ -1,17 +1,17 @@
-// Sidebar — left icon rail navigation.
-// GOOGLE OAUTH — not used in workshop version
-// Uncomment the logout block below to re-enable session logout (requires Flask /auth/logout + credentials)
-
-export default function Sidebar({ NAV_ITEMS, activeNav, setActiveNav }) {
+/**
+ * Fixed icon rail: primary app sections (workshop uses local state only).
+ */
+export default function Sidebar({ navigationItems, activeNav, onNavChange }) {
   return (
     <aside className="icon-rail">
       <div className="rail-logo">◈</div>
 
-      {NAV_ITEMS.map((item) => (
+      {navigationItems.map((item) => (
         <button
           key={item.label}
+          type="button"
           className={`rail-btn ${activeNav === item.label ? "active" : ""}`}
-          onClick={() => setActiveNav(item.label)}
+          onClick={() => onNavChange(item.label)}
           title={item.label}
         >
           <span className="rail-icon">{item.icon}</span>
@@ -20,20 +20,6 @@ export default function Sidebar({ NAV_ITEMS, activeNav, setActiveNav }) {
       ))}
 
       <div className="rail-spacer" />
-
-      {/*
-      GOOGLE OAUTH — not used in workshop version
-      <button
-        className="rail-btn rail-logout"
-        onClick={() =>
-          fetch(`${API}/auth/logout`, { credentials: "include" }).then(() => setUser(null))
-        }
-        title="Logout"
-      >
-        <span className="rail-icon">⇥</span>
-        <span className="rail-label">Logout</span>
-      </button>
-      */}
     </aside>
   );
 }
