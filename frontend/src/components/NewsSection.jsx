@@ -1,3 +1,5 @@
+import { NEWS_PREVIEW_MAX } from "../utils/newsUtils";
+
 /**
  * Scrollable list of headline + source + date (workshop placeholder copy).
  * `articles` and `items` are aliases; at most `maxArticles` rows are shown.
@@ -6,7 +8,7 @@ export default function NewsSection({
   items,
   articles,
   title = "Latest News",
-  maxArticles = 4,
+  maxArticles = NEWS_PREVIEW_MAX,
 }) {
   const raw = articles ?? items ?? [];
   const visible = raw.slice(0, maxArticles);

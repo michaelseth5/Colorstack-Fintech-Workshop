@@ -1,18 +1,20 @@
-# Colorstack Fintech Workshop
+# ColorStack Fintech Workshop
 
-Full-stack stock dashboard: **Flask** backend + **React (Vite)** frontend. Stock data comes from **yfinance** (Yahoo Finance) — no RapidAPI key required for the workshop.
+Full-stack stock dashboard: **Flask** + **yfinance** on the backend, **React** + **Vite** on the frontend. Live Yahoo data only — the API returns errors when a quote or history cannot be loaded (no fake numbers).
 
-**Live data only:** the API returns **503** if Yahoo does not provide a usable live quote or daily history (no demo numbers, no empty history masquerading as success). Quotes follow Yahoo’s usual delay rules.
+## Project structure
 
-## Workshop Version
+```text
+├── frontend/    # React + Vite
+├── backend/     # Flask + yfinance
+├── .gitignore
+├── README.md
+└── .env.example # placeholders (copy into backend/.env or frontend/.env as needed)
+```
 
-- **Google OAuth is disabled** — the UI uses a fixed “Workshop User” and does not call `/auth/*` or send cookies.
-- **No `.env` file is required** to run the backend; optional `FRONTEND_URL` helps CORS if your dev port is not the default.
-- Data is fetched with **yfinance** inside `backend/app.py` (no external API keys).
+## Setup
 
-### Setup (minimal)
-
-**Backend**
+### Backend
 
 ```bash
 cd backend
@@ -20,33 +22,26 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Runs at `http://localhost:5000`. Try `http://127.0.0.1:5000/api/stock/AAPL` for a live quote.
+API base URL defaults to `http://localhost:5000`. Optional environment variables are listed in `backend/.env.example` and the root `.env.example`.
 
-**Frontend**
+### Frontend
 
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev
 ```
 
-Open the URL Vite prints (often `http://localhost:5173`). Optional: set `VITE_API_BASE_URL` in `frontend/.env` if the API is not on port 5000.
+Open the URL Vite prints (often `http://localhost:5173`). To point at a different API host, set `VITE_API_BASE_URL` in `frontend/.env` (see root `.env.example`).
 
-## Full Version (re-enable Google OAuth)
+## Environment variables
 
-1. In `backend/app.py`, follow the commented **GOOGLE OAUTH** block: uncomment routes and add `requests` to `requirements.txt`.
-2. Copy `backend/.env.example` to `backend/.env` and set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, and `FLASK_SECRET_KEY`.
-3. Set `supports_credentials=True` in CORS and use `credentials: "include"` on auth-related `fetch` calls in React.
-4. In `frontend/src/App.jsx` and `Sidebar.jsx`, uncomment the OAuth / login / logout sections marked with **GOOGLE OAUTH**.
+See **`.env.example`** at the repository root and **`backend/.env.example`** for Flask-only placeholders. Do not commit real `.env` files or API keys.
 
-## Project layout
+## Google OAuth (optional full version)
 
-```text
-backend/   — Flask API (yfinance)
-frontend/  — React + Vite UI
-```
+Workshop mode uses a fixed demo user. To re-enable Google sign-in, follow **`backend/GOOGLE_OAUTH_SETUP.md`** and the commented OAuth sections in the codebase.
 
-## How frontend and backend communicate
+## Frontend layout
 
-- React calls `GET /api/stock/<ticker>` for quote fields and `GET /api/stock/<ticker>/history` for chart data (merged in the UI), and `GET /api/stock/<ticker>/news` for live Yahoo headlines (yfinance).
-- CORS allows localhost dev origins; workshop mode does **not** use sessions or cookies.
+`frontend/src` is organized as `api/`, `components/`, `constants/`, `hooks/`, and `utils/`, with `App.jsx` and `main.jsx` as entry points.

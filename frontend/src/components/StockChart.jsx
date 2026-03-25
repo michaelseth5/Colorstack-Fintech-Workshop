@@ -15,7 +15,7 @@ import {
   getAxisTickDates,
   msToYmd,
   ymdToUtcMs,
-} from "../chartRangeUtils";
+} from "../utils/chartUtils";
 
 /** Recharts chart height in px (fixed wrapper height avoids overflow at zoom). */
 const CHART_HEIGHT_PX = 200;

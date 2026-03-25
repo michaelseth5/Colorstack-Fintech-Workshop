@@ -3,6 +3,7 @@ dist/
 build/
 
 .env
+backend/.env
 
 __pycache__/
 *.pyc
