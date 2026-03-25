@@ -1,122 +1,76 @@
-# ColorStack UTD — Finance Dashboard Workshop
+# Colorstack Fintech Workshop
 
-Build a live stock dashboard with Google OAuth + Yahoo Finance.  
-**Stack:** Python (Flask) · React · yfinance · Recharts
+This project is a full-stack stock dashboard:
+- **Backend**: Flask API for auth/session and stock data aggregation
+- **Frontend**: React + Vite dashboard UI
 
----
+## Project Structure
 
-## Prerequisites
-
-Install these before the workshop:
-
-- [Python 3.10+](https://www.python.org/downloads/)
-- [Node.js 18+](https://nodejs.org/)
-- [Git](https://git-scm.com/)
-- [VS Code](https://code.visualstudio.com/)
-
----
-
-## Setup (do this before 6:00 PM)
-
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/YOUR_ORG/colorstack-workshop.git
-cd colorstack-workshop
+```text
+project/
+├── backend/
+│   ├── app.py
+│   ├── requirements.txt
+│   ├── .env
+│   └── .env.example
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── index.js
+│   │   └── components/
+│   ├── public/
+│   ├── package.json
+│   └── .env
+├── .gitignore
+└── README.md
 ```
 
-### 2. Backend setup
+## Run the Backend
 
 ```bash
 cd backend
 python -m venv venv
-
-# Mac/Linux
-source venv/bin/activate
-
-# Windows
-venv\Scripts\activate
-
+venv\Scripts\activate   # Windows
 pip install -r requirements.txt
-```
-
-### 3. Add your environment variables
-
-```bash
-cp ../.env.example .env
-```
-
-Open `.env` and fill in your Google OAuth credentials (see `GOOGLE_OAUTH_SETUP.md`).
-
-### 4. Start the backend
-
-```bash
 python app.py
-# Running on http://localhost:5000
 ```
 
-### 5. Frontend setup (new terminal tab)
+Backend runs at `http://localhost:5000`.
+
+## Run the Frontend
 
 ```bash
 cd frontend
 npm install
 npm start
-# Running on http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — you should see the login screen.
+Frontend runs on Vite dev port (usually `http://localhost:5173`).
 
----
+## Required Environment Variables
 
-## Workshop checkpoint branches
+### `backend/.env`
 
-If you fall behind, jump to any checkpoint:
-
-```bash
-git checkout step-1-auth        # Google OAuth complete
-git checkout step-2-api-call    # Yahoo Finance endpoint working
-git checkout step-3-dashboard   # Full React dashboard complete
+```env
+GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+GOOGLE_REDIRECT_URI=http://localhost:5000/auth/callback
+FLASK_SECRET_KEY=change_this_to_a_random_string
+FLASK_ENV=development
+RAPIDAPI_KEY=your_key_here
+RAPIDAPI_HOST=yahoo-finance15.p.rapidapi.com
+FRONTEND_URL=http://localhost:5173
 ```
 
----
+### `frontend/.env`
 
-## API reference
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/auth/login` | GET | Redirects to Google OAuth |
-| `/auth/callback` | GET | Handles OAuth redirect |
-| `/auth/me` | GET | Returns logged-in user |
-| `/auth/logout` | GET | Clears session |
-| `/api/stock/<ticker>` | GET | Returns price + 30-day history |
-
-### Example stock response
-
-```json
-{
-  "ticker": "AAPL",
-  "name": "Apple Inc.",
-  "price": 213.55,
-  "change": 1.24,
-  "market_cap": 3200000000000,
-  "history": [
-    { "date": "2025-02-17", "close": 210.11 },
-    ...
-  ]
-}
+```env
+VITE_API_BASE_URL=http://localhost:5000
 ```
 
----
+## How Frontend and Backend Communicate
 
-## Stretch goals (open build time)
-
-- Add multiple tickers to compare side by side
-- Show volume or market cap metrics
-- Add a watchlist saved to localStorage
-- Deploy to Vercel (frontend) + Railway (backend)
-
----
-
-## Questions?
-
-Ping us in the ColorStack UTD Discord or GroupMe.
+- React sends requests to Flask at `http://localhost:5000`
+- Flask enables CORS for localhost dev ports and supports credentials
+- Auth state is stored in Flask session and read by `/auth/me`
+- Stock UI reads `/api/stock/<ticker>` and renders live or fallback data
