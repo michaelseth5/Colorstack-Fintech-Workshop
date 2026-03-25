@@ -201,6 +201,63 @@ def serve_health_ping():
 # --- Stock (yfinance) ---
 
 
+def build_news_list(ticker_symbol: str, stock: Any = None) -> list[dict[str, Any]]:
+    """Normalize yfinance Ticker.news into {title, source, date, link} rows."""
+    if stock is None:
+        stock = _yf_ticker(ticker_symbol)
+    raw = getattr(stock, "news", None)
+    if not raw:
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw[:12]:
+        if not isinstance(item, dict):
+            continue
+        title = (item.get("title") or "").strip()
+        if not title:
+            continue
+        publisher = (item.get("publisher") or "Yahoo Finance").strip()
+        link = item.get("link") or ""
+        ts = item.get("providerPublishTime")
+        date_str = ""
+        if ts is not None:
+            try:
+                tsv = float(ts)
+                if tsv > 1e12:
+                    tsv /= 1000.0
+                date_str = datetime.fromtimestamp(tsv, tz=timezone.utc).strftime(
+                    "%b %d, %Y · %H:%M UTC"
+                )
+            except (OSError, OverflowError, ValueError, TypeError):
+                date_str = ""
+        out.append(
+            {
+                "title": title,
+                "source": publisher,
+                "date": date_str,
+                "link": link,
+            }
+        )
+    return out
+
+
+@app.route("/api/stock/<ticker>/news")
+def serve_stock_news_json(ticker):
+    """Return recent Yahoo Finance news headlines for the symbol (via yfinance)."""
+    ticker_symbol = ticker.upper()
+    try:
+        stock = _yf_ticker(ticker_symbol)
+        articles = build_news_list(ticker_symbol, stock=stock)
+        return jsonify(
+            {
+                "ticker": ticker_symbol,
+                "articles": articles,
+                "data_source": "yfinance",
+            }
+        )
+    except Exception as exc:
+        return json_error_response(str(exc), ticker_symbol, 503)
+
+
 @app.route("/api/stock/<ticker>/history")
 def serve_stock_history_json(ticker):
     """Return daily history only: ticker, history, history_start, data_source."""

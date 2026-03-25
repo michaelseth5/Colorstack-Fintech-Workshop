@@ -48,5 +48,5 @@ frontend/  — React + Vite UI
 
 ## How frontend and backend communicate
 
-- React calls `GET /api/stock/<ticker>` for quote fields and `GET /api/stock/<ticker>/history` for chart data (merged in the UI).
+- React calls `GET /api/stock/<ticker>` for quote fields and `GET /api/stock/<ticker>/history` for chart data (merged in the UI), and `GET /api/stock/<ticker>/news` for live Yahoo headlines (yfinance).
 - CORS allows localhost dev origins; workshop mode does **not** use sessions or cookies.

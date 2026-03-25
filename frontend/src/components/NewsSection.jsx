@@ -15,19 +15,42 @@ export default function NewsSection({
     <section className="news-section panel-news-card news-panel-muted" aria-label={title}>
       <h3 className="news-section-heading">{title}</h3>
       {visible.length === 0 ? (
-        <p className="panel-news-empty">Search a ticker to load headlines.</p>
+        <p className="panel-news-empty">
+          No headlines loaded. Pick a ticker or check that the backend is running.
+        </p>
       ) : (
-        visible.map((item, index) => (
-          <div className="news-item" key={`${item.title}-${index}`}>
-            <span className="news-title">{item.title}</span>
-            <span className="news-meta">
-              <span className="news-source">{item.source}</span>
-              {item.date != null && item.date !== "" && (
-                <span className="news-date">{item.date}</span>
-              )}
-            </span>
-          </div>
-        ))
+        visible.map((item, index) => {
+          const key = `${item.title}-${index}`;
+          const inner = (
+            <>
+              <span className="news-title">{item.title}</span>
+              <span className="news-meta">
+                <span className="news-source">{item.source}</span>
+                {item.date != null && item.date !== "" && (
+                  <span className="news-date">{item.date}</span>
+                )}
+              </span>
+            </>
+          );
+          if (item.link) {
+            return (
+              <a
+                className="news-item news-item-link"
+                key={key}
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {inner}
+              </a>
+            );
+          }
+          return (
+            <div className="news-item" key={key}>
+              {inner}
+            </div>
+          );
+        })
       )}
     </section>
   );

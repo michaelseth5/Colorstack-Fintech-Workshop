@@ -1,14 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { fetchStockQuote } from "./api/stockClient";
+import { fetchStockNews, fetchStockQuote } from "./api/stockClient";
 import { getChartDataForRange } from "./chartRangeUtils";
 import LeftPanel from "./components/LeftPanel";
 import PortfolioPanel from "./components/PortfolioPanel";
 import Sidebar from "./components/Sidebar";
 import StockChart from "./components/StockChart";
 import TopBar from "./components/TopBar";
-import { buildNewsHeadlines } from "./utils/newsUtils";
-
 import "./App.css";
 
 /** Workshop demo user (shown when Google OAuth is off). */
@@ -52,6 +50,7 @@ export default function App() {
   const [activeNavigation, setActiveNavigation] = useState("Terminal");
   const [isWatchlistInputVisible, setIsWatchlistInputVisible] = useState(false);
   const [watchlistInputValue, setWatchlistInputValue] = useState("");
+  const [newsArticles, setNewsArticles] = useState([]);
 
   const loadStock = useCallback(async (tickerSymbol, options = {}) => {
     const silent = options.silent === true;
@@ -129,11 +128,25 @@ export default function App() {
     };
   }, [watchlistTickers]);
 
-  const newsItems = useMemo(
-    () =>
-      stock ? buildNewsHeadlines(stock.name, stock.symbol) : [],
-    [stock]
-  );
+  useEffect(() => {
+    let cancelled = false;
+    const sym = selectedTicker?.trim().toUpperCase();
+    if (!sym) {
+      setNewsArticles([]);
+      return undefined;
+    }
+    (async () => {
+      try {
+        const articles = await fetchStockNews(sym);
+        if (!cancelled) setNewsArticles(articles);
+      } catch {
+        if (!cancelled) setNewsArticles([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTicker]);
 
   const chartData = useMemo(
     () => getChartDataForRange(stock?.history, selectedRange),
@@ -193,7 +206,7 @@ export default function App() {
         wlInput={watchlistInputValue}
         setWlInput={setWatchlistInputValue}
         handleSearch={handleSearchSubmit}
-        articles={newsItems}
+        articles={newsArticles}
         quoteSnapshots={quoteSnapshots}
         onRemoveWatchlistTicker={handleRemoveWatchlistTicker}
       />

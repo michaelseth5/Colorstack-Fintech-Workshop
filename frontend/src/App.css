@@ -671,6 +671,11 @@ body {
   border-color: var(--border);
 }
 
+a.news-item-link {
+  text-decoration: none;
+  color: inherit;
+}
+
 .news-title {
   font-size: 12px;
   font-weight: 600;
